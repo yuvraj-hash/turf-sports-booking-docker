@@ -116,15 +116,7 @@ const Navbar: React.FC<NavbarProps> = ({
             >
               Contact
             </Link>
-            <Link
-              to="/admin"
-              onClick={() => onNavigation("admin")}
-              className={`px-3 py-2 ${currentPage === "admin" ? "text-[#ff5e14]" : "text-gray-700 hover:text-[#ff5e14]"} font-medium rounded-md transition flex items-center`}
-            >
-              <Shield size={16} className="mr-1" />
-              Admin
-            </Link>
-          </div>
+            </div>
 
           {/* User Authentication */}
           <div className="hidden md:flex items-center space-x-3">
@@ -224,17 +216,6 @@ const Navbar: React.FC<NavbarProps> = ({
               className={`block px-3 py-2 ${currentPage === "contact" ? "text-[#ff5e14]" : "text-gray-700 hover:text-[#ff5e14]"} font-medium rounded-md transition`}
             >
               Contact
-            </Link>
-            <Link
-              to="/admin"
-              onClick={() => {
-                onNavigation("admin")
-                setMenuOpen(false)
-              }}
-              className={`block px-3 py-2 ${currentPage === "admin" ? "text-[#ff5e14]" : "text-gray-700 hover:text-[#ff5e14]"} font-medium rounded-md transition flex items-center`}
-            >
-              <Shield size={16} className="mr-1" />
-              Admin
             </Link>
 
             <div className="pt-4 pb-3 border-t border-gray-200">

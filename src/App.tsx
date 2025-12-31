@@ -18,7 +18,6 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import Events from './pages/Events';
 import Booking from './pages/Booking';
-import Admin from './pages/Admin';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import RefundPolicy from './pages/RefundPolicy';
@@ -182,7 +181,6 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/events" element={<Events />} />
           <Route path="/booking" element={<Booking />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
