@@ -36,7 +36,7 @@ const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClose, onLo
     const { usernameOrEmail, password } = formData
     const isValidUsername = usernameOrEmail === "yuvraj"
     const isValidEmail = usernameOrEmail === "yuva.tvm2001@gmail.com"
-    const isValidPassword = password === "zxcvbnm123"
+    const isValidPassword = password === "awsamplify123"
 
     if ((isValidUsername || isValidEmail) && isValidPassword) {
       const sessionData = {

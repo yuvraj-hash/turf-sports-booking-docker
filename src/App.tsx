@@ -21,6 +21,7 @@ import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import RefundPolicy from './pages/RefundPolicy';
 import Dashboard from './pages/Dashboard';
+import Admin from './pages/Admin';
 import Confirm from './components/modals/Confirm';
 import ResetPassword from './components/modals/ResetPassword';
 import { getCurrentUser, signOut } from './lib/supabase';
@@ -196,6 +197,7 @@ function App() {
           />
           <Route path="/confirm" element={<Confirm />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
 
