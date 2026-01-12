@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { User, Heart, Award, MapPin, ChevronRight, LogIn, LogOut, UserCircle, Menu, X } from 'lucide-react';
 import Preloader from './components/Preloader';
-import GlassModal from './components/GlassModal';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -130,7 +129,6 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <GlassModal />
       <div className="bg-[#2f3241] text-white py-2 px-4 text-sm hidden md:block">
         <div className="container mx-auto flex justify-between">
           <div className="flex items-center space-x-4">
