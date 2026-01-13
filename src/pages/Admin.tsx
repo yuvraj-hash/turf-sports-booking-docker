@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import AdminLoginModal from "../components/modals/AdminLoginModal"
 import AddAdminModal from "../components/modals/AddAdminModal"
+import { getBookings, getRegistrations, getNewsletterSubscribers, type Booking, type Registration, type NewsletterSubscriber } from "../lib/supabase"
 
 const Admin: React.FC = () => {
   const navigate = useNavigate()
@@ -37,6 +38,11 @@ const Admin: React.FC = () => {
   const [editEvent, setEditEvent] = useState<any | null>(null)
   const [editSport, setEditSport] = useState<any | null>(null)
   const [editBlock, setEditBlock] = useState<any | null>(null)
+
+  // Loading states
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true)
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(true)
+  const [isLoadingSubscribers, setIsLoadingSubscribers] = useState(true)
 
   // Form states
   const [eventForm, setEventForm] = useState({
@@ -66,85 +72,16 @@ const Admin: React.FC = () => {
     description: "",
   })
 
-  // Mock data for sports bookings
-  const [sportsBookings, setSportsBookings] = useState([
-    {
-      id: 1,
-      sport: "Football",
-      date: new Date().toISOString().split("T")[0],
-      time: "14:00-16:00",
-      userName: "John Doe",
-      phone: "+91 9876543210",
-      location: "Chennai Central",
-    },
-    {
-      id: 2,
-      sport: "Badminton",
-      date: "2025-03-16",
-      time: "10:00-12:00",
-      userName: "Priya Sharma",
-      phone: "1",
-      location: "Hyderabad",
-    },
-    {
-      id: 3,
-      sport: "Football",
-      date: new Date().toISOString().split("T")[0],
-      time: "18:00-20:00",
-      userName: "Rahul Kumar",
-      phone: "2",
-      location: "Chennai Central",
-    },
-    {
-      id: 4,
-      sport: "Basketball",
-      date: "2025-03-18",
-      time: "18:00-20:00",
-      userName: "Sneha Reddy",
-      phone: "3",
-      location: "Hyderabad",
-    },
-  ])
+  // Real data from Supabase - Bookings (Sports + Events)
+  const [allBookings, setAllBookings] = useState<Booking[]>([])
+  const [sportsBookings, setSportsBookings] = useState<Booking[]>([])
+  const [eventBookings, setEventBookings] = useState<Booking[]>([])
 
-  // Mock data for event bookings
-  const [eventBookings, setEventBookings] = useState([
-    {
-      id: 1,
-      eventName: "Chennai Corporate Cricket League",
-      userName: "Rahul Kumar",
-      phone: "2",
-      date: new Date().toISOString().split("T")[0],
-      time: "09:00-18:00",
-      participants: 15,
-    },
-    {
-      id: 2,
-      eventName: "Badminton Masterclass",
-      userName: "Sneha Reddy",
-      phone: "3",
-      date: "2025-07-08",
-      time: "10:00-17:00",
-      participants: 1,
-    },
-    {
-      id: 3,
-      eventName: "Weekend Football Tournament",
-      userName: "Amit Patel",
-      phone: "4",
-      date: "2025-05-20",
-      time: "08:00-18:00",
-      participants: 7,
-    },
-    {
-      id: 4,
-      eventName: "Tennis Open Day",
-      userName: "Meera Singh",
-      phone: "5",
-      date: new Date().toISOString().split("T")[0],
-      time: "09:00-17:00",
-      participants: 2,
-    },
-  ])
+  // Real data from Supabase - Event Registrations
+  const [eventRegistrations, setEventRegistrations] = useState<Registration[]>([])
+
+  // Real data from Supabase - Newsletter Subscribers
+  const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([])
 
   // Mock scheduled events and sports
   const [scheduledEvents, setScheduledEvents] = useState([
@@ -210,58 +147,6 @@ const Admin: React.FC = () => {
     },
   ])
 
-  // Mock data for newsletter subscribers
-  const [subscribers, setSubscribers] = useState([
-    {
-      id: 1,
-      email: "john.doe@example.com",
-      subscribedDate: "2025-01-15",
-      status: "active",
-    },
-    {
-      id: 2,
-      email: "priya.sharma@gmail.com",
-      subscribedDate: "2025-01-20",
-      status: "active",
-    },
-    {
-      id: 3,
-      email: "rahul.kumar@company.com",
-      subscribedDate: "2025-02-01",
-      status: "active",
-    },
-    {
-      id: 4,
-      email: "sneha.reddy@outlook.com",
-      subscribedDate: "2025-02-10",
-      status: "active",
-    },
-    {
-      id: 5,
-      email: "amit.patel@yahoo.com",
-      subscribedDate: "2025-02-15",
-      status: "active",
-    },
-    {
-      id: 6,
-      email: "meera.singh@hotmail.com",
-      subscribedDate: "2025-02-20",
-      status: "active",
-    },
-    {
-      id: 7,
-      email: "sports.enthusiast@gmail.com",
-      subscribedDate: "2025-03-01",
-      status: "active",
-    },
-    {
-      id: 8,
-      email: "fitness.lover@example.com",
-      subscribedDate: "2025-03-05",
-      status: "active",
-    },
-  ])
-
   const timeSlots = [
     "08:00-10:00",
     "10:00-12:00",
@@ -302,38 +187,70 @@ const Admin: React.FC = () => {
     checkSession()
   }, [])
 
-  // Fetch bookings from database (placeholder for API calls)
+  // Fetch real bookings, registrations, and subscribers from Supabase
   useEffect(() => {
-    // TODO: Replace mock data with API calls to fetch bookings
-    /*
-    const fetchBookings = async () => {
+    const fetchData = async () => {  
+      if (!isAuthenticated) {
+        console.log('⚠️ Not authenticated, skipping data fetch');
+        return;
+      }
+      
+      console.log('🔄 Starting data fetch...');
+      
       try {
-        const sportsResponse = await fetch('/api/sports-bookings');
-        const sportsData = await sportsResponse.json();
-        setSportsBookings(sportsData);
+        // Fetch bookings
+        setIsLoadingBookings(true);
+        console.log('📡 Fetching bookings from Supabase...');
+        const bookingsData = await getBookings();
+        console.log('✅ Bookings fetched:', bookingsData.length);
+        console.log('📋 Sample booking data:', bookingsData[0]);
+        setAllBookings(bookingsData);
+        
+        // Separate bookings by type (sports vs events)
+        const sports = bookingsData.filter(b => b.booking_type === 'sports');
+        const events = bookingsData.filter(b => b.booking_type === 'events');
+        console.log('⚽ Sports bookings:', sports.length);
+        console.log('🎪 Event bookings:', events.length);
+        
+        // Log all booking dates to see what's in the database
+        if (bookingsData.length > 0) {
+          console.log('📅 All booking dates in database:');
+          bookingsData.forEach((b, index) => {
+            console.log(`  ${index + 1}. ${b.sport} - Date: ${b.date} (Type: ${b.booking_type})`);
+          });
+        } else {
+          console.warn('⚠️ No bookings found in database!');
+        }
+        
+        setSportsBookings(sports);
+        setEventBookings(events);
+        setIsLoadingBookings(false);
 
-        const eventsResponse = await fetch('/api/event-bookings');
-        const eventsData = await eventsResponse.json();
-        setEventBookings(eventsData);
+        // Fetch registrations
+        setIsLoadingRegistrations(true);
+        const registrationsData = await getRegistrations();
+        console.log('✅ Registrations fetched:', registrationsData.length);
+        setEventRegistrations(registrationsData);
+        setIsLoadingRegistrations(false);
 
-        const eventsResponse = await fetch('/api/scheduled-events');
-        const eventsData = await eventsResponse.json();
-        setScheduledEvents(eventsData);
-
-        const sportsResponse = await fetch('/api/scheduled-sports');
-        const sportsData = await sportsResponse.json();
-        setScheduledSports(sportsData);
-
-        const blocksResponse = await fetch('/api/blocked-slots');
-        const blocksData = await blocksResponse.json();
-        setBlockedSlots(blocksData);
+        // Fetch newsletter subscribers
+        setIsLoadingSubscribers(true);
+        const subscribersData = await getNewsletterSubscribers();
+        console.log('✅ Subscribers fetched:', subscribersData.length);
+        setSubscribers(subscribersData);
+        setIsLoadingSubscribers(false);
+        
+        console.log('✅ All data fetched successfully!');
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('❌ Error fetching data:', error);
+        setIsLoadingBookings(false);
+        setIsLoadingRegistrations(false);
+        setIsLoadingSubscribers(false);
       }
     };
-    fetchBookings();
-    */
-  }, [])
+
+    fetchData();
+  }, [isAuthenticated])
 
   const clearSession = () => {
     localStorage.removeItem("adminSession")
@@ -342,10 +259,21 @@ const Admin: React.FC = () => {
     setAdminData(null)
   }
 
-  const handleLogin = (userData: { username: string; email: string }) => {
-    setAdminData(userData)
+  const handleLogin = (userData: { username: string; email: string; rememberMe: boolean }) => {
+    setAdminData({ username: userData.username, email: userData.email })
     setIsAuthenticated(true)
     setShowLoginModal(false)
+    
+    // Store session data
+    const sessionData = JSON.stringify({
+      username: userData.username,
+      email: userData.email,
+    })
+    if (userData.rememberMe) {
+      localStorage.setItem("adminSession", sessionData)
+    } else {
+      sessionStorage.setItem("adminSession", sessionData)
+    }
   }
 
   const handleAddAdmin = (newAdminData: { username: string; email: string; password: string }) => {
@@ -510,54 +438,133 @@ const Admin: React.FC = () => {
 
   // Filter bookings based on search term and today's date
   const today = new Date().toISOString().split("T")[0]
-  const filteredSportsBookings = sportsBookings.filter((booking) =>
-    Object.values(booking).some((value) => value.toString().toLowerCase().includes(searchTerm.toLowerCase())),
+  console.log('\n═══════════════════════════════════════');
+  console.log('📅 TODAY\'S DATE FOR FILTERING:', today);
+  console.log('═══════════════════════════════════════');
+  console.log('📊 Total bookings fetched:', allBookings.length);
+  console.log('⚽ Sports bookings (all):', sportsBookings.length);
+  console.log('🎪 Event bookings:', eventBookings.length);
+  console.log('═══════════════════════════════════════\n');
+  
+  // Filter sports bookings to exclude Gym and Swimming Pool (only actual sports)
+  const actualSportsBookings = sportsBookings.filter((booking) => {
+    const sportLower = booking.sport.toLowerCase();
+    return !sportLower.includes('gym') && !sportLower.includes('swimming');
+  });
+  
+  const filteredSportsBookings = actualSportsBookings.filter((booking) =>
+    Object.values(booking).some((value) => value?.toString().toLowerCase().includes(searchTerm.toLowerCase())),
   )
   const filteredEventBookings = eventBookings.filter((booking) =>
-    Object.values(booking).some((value) => value.toString().toLowerCase().includes(searchTerm.toLowerCase())),
+    Object.values(booking).some((value) => value?.toString().toLowerCase().includes(searchTerm.toLowerCase())),
   )
-  const todaySportsBookings = sportsBookings.filter((booking) => booking.date === today)
-  const todayEventBookings = eventBookings.filter((booking) => booking.date === today)
+  
+  // Normalize date format for comparison (handle both YYYY-MM-DD and other formats)
+  const normalizeDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toISOString().split("T")[0];
+  };
+  
+  const todaySportsBookings = actualSportsBookings.filter((booking) => {
+    try {
+      const normalized = normalizeDate(booking.date);
+      const isToday = normalized === today;
+      console.log(`🔍 Checking sports booking: ${booking.sport}`);
+      console.log(`   - Original date: ${booking.date}`);
+      console.log(`   - Normalized: ${normalized}`);
+      console.log(`   - Today: ${today}`);
+      console.log(`   - Match: ${isToday ? '✅ YES' : '❌ NO'}`);
+      if (isToday) {
+        console.log('✅ TODAY\'S SPORTS BOOKING FOUND:', booking.sport, booking.location, booking.time_slot);
+      }
+      return isToday;
+    } catch (error) {
+      console.error('❌ Error normalizing date:', error);
+      return booking.date === today;
+    }
+  });
+  
+  const todayEventBookings = eventBookings.filter((booking) => {
+    try {
+      const normalized = normalizeDate(booking.date);
+      const isToday = normalized === today;
+      console.log(`🔍 Checking event booking: ${booking.sport}`);
+      console.log(`   - Original date: ${booking.date}`);
+      console.log(`   - Normalized: ${normalized}`);
+      console.log(`   - Today: ${today}`);
+      console.log(`   - Match: ${isToday ? '✅ YES' : '❌ NO'}`);
+      if (isToday) {
+        console.log('✅ TODAY\'S EVENT BOOKING FOUND:', booking.sport, booking.location, booking.time_slot);
+      }
+      return isToday;
+    } catch (error) {
+      console.error('❌ Error normalizing date:', error);
+      return booking.date === today;
+    }
+  });
+  
+  console.log('\n═══════════════════════════════════════');
+  console.log('📊 FILTERING RESULTS:');
+  console.log('═══════════════════════════════════════');
+  console.log('⚽ Today\'s Sports Bookings:', todaySportsBookings.length);
+  console.log('🎪 Today\'s Event Bookings:', todayEventBookings.length);
+  console.log('🎯 Actual Sports (excl gym/pool):', actualSportsBookings.length);
+  console.log('═══════════════════════════════════════\n');
 
+  // Filter recent bookings (today) and scheduled bookings (future)
+  const recentBookings = allBookings.filter((booking) => {
+    try {
+      return normalizeDate(booking.date) === today;
+    } catch {
+      return booking.date === today;
+    }
+  });
+  
+  const scheduledBookings = allBookings.filter((booking) => {
+    try {
+      return new Date(normalizeDate(booking.date)) > new Date(today);
+    } catch {
+      return new Date(booking.date) > new Date(today);
+    }
+  });
+  
+  // Sort scheduled bookings by date (earliest first)
+  const sortedScheduledBookings = [...scheduledBookings].sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+  
   // Filter subscribers based on search term
   const filteredSubscribers = subscribers.filter((subscriber) =>
     subscriber.email.toLowerCase().includes(searchTerm.toLowerCase()),
   )
-
+  
   // Analytics calculations
   // Calculate peak booking hours
   const frequencies: Record<string, number> = {}
   timeSlots.forEach((slot) => (frequencies[slot] = 0))
-  ;[...sportsBookings, ...eventBookings].forEach((booking) => {
-    const slot = booking.time
+  ;[...actualSportsBookings, ...eventBookings].forEach((booking) => {
+    const slot = booking.time_slot
     if (frequencies[slot]) frequencies[slot]++
     else frequencies[slot] = 1
   })
   const peakHours = Object.keys(frequencies).reduce((a, b) => (frequencies[a] > frequencies[b] ? a : b), timeSlots[0])
-
+  
   // Calculate most popular sport
   const sportFrequencies: Record<string, number> = {}
-  sportsBookings.forEach((booking) => {
+  actualSportsBookings.forEach((booking) => {
     if (sportFrequencies[booking.sport]) sportFrequencies[booking.sport]++
     else sportFrequencies[booking.sport] = 1
   })
   const mostPopularSport = Object.keys(sportFrequencies).reduce(
     (a, b) => (sportFrequencies[a] > sportFrequencies[b] ? a : b),
-    sportsBookings[0]?.sport || "None",
+    actualSportsBookings[0]?.sport || "None",
   )
-  const totalSportBookings = sportsBookings.length
+  const totalSportBookings = actualSportsBookings.length
   const popularSportPercentage =
     totalSportBookings > 0 ? ((sportFrequencies[mostPopularSport] / totalSportBookings) * 100).toFixed(0) : "0"
-
-  // Calculate average session duration
-  const parseTime = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number)
-    return hours * 60 + minutes
-  }
-  const durations = [...sportsBookings, ...eventBookings].map((booking) => {
-    const [start, end] = booking.time.split("-")
-    return parseTime(end) - parseTime(start)
-  })
+  
+  // Calculate average session duration from booking duration field
+  const durations = [...actualSportsBookings, ...eventBookings].map((booking) => booking.duration)
   const averageDurationMinutes =
     durations.length > 0 ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length : 0
   const averageDurationHours = (averageDurationMinutes / 60).toFixed(1)
@@ -606,194 +613,278 @@ const Admin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Wrapper */}
-      <div className="py-2">
-        {/* Header */}
-        <div className="bg-white shadow">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50/30 to-slate-50">
+      {/* Premium Header with Glassmorphism */}
+      <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-orange-100/50 shadow-lg shadow-orange-500/5">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-5">
+            {/* Left Section - Admin Info */}
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl blur-md opacity-75 animate-pulse-slow"></div>
+                <div className="relative rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 p-3 shadow-xl">
+                  <Shield className="text-white" size={28} strokeWidth={2.5} />
+                </div>
+              </div>
               <div>
-                <h1 className="text-2xl font-bold text-[#2f3241]">Admin Dashboard</h1>
-                <p className="text-sm text-gray-600">Welcome back, {adminData?.username}</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-orange-900 bg-clip-text text-transparent">Admin Dashboard</h1>
+                <p className="text-sm text-slate-600 font-medium">Welcome back, <span className="text-orange-600 font-semibold">{adminData?.username}</span></p>
               </div>
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => setShowAddAdminModal(true)}
-                  className="flex items-center px-4 py-2 bg-[#ff5e14] text-white rounded-md hover:bg-[#e54d00] transition-colors duration-300"
-                >
-                  <Users size={18} className="mr-2" />
-                  Add Admin
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-300"
-                >
-                  <LogOut size={18} className="mr-2" />
-                  Logout
-                </button>
-              </div>
+            </div>
+            
+            {/* Right Section - Action Buttons */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAddAdminModal(true)}
+                className="group relative overflow-hidden flex items-center px-5 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl shadow-lg shadow-orange-500/30 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/40 hover:scale-105 active:scale-95"
+              >
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+                <Users size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+                <span className="relative z-10 font-semibold">Add Admin</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="group flex items-center px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl border-2 border-slate-200 transition-all duration-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 hover:scale-105 active:scale-95"
+              >
+                <LogOut size={18} className="mr-2 transition-transform duration-300 group-hover:translate-x-1" strokeWidth={2.5} />
+                <span className="font-semibold">Logout</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="text-blue-600" size={24} />
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Premium Stats Cards with Depth Psychology */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-10">
+          {/* Sports Bookings Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl border border-blue-100/50 shadow-lg shadow-blue-500/5 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/30 transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                  <Users className="text-white" size={24} strokeWidth={2.5} />
+                </div>
+                <div className="px-2.5 py-1 bg-blue-100 rounded-full">
+                  <TrendingUp size={14} className="text-blue-600" />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Sports Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{sportsBookings.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar className="text-green-600" size={24} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Event Bookings</p>
-                <p className="text-2xl font-bold text-gray-900">{eventBookings.length}</p>
+              <p className="text-sm font-semibold text-slate-600 mb-1">Sports Bookings</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">{actualSportsBookings.length}</p>
+              <div className="mt-3 pt-3 border-t border-blue-100">
+                <p className="text-xs text-slate-500">Active sports (excl. gym)</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="text-yellow-600" size={24} />
+          {/* Event Bookings Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl border border-green-100/50 shadow-lg shadow-green-500/5 transition-all duration-500 hover:shadow-2xl hover:shadow-green-500/10 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg shadow-green-500/30 transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                  <Calendar className="text-white" size={24} strokeWidth={2.5} />
+                </div>
+                <div className="px-2.5 py-1 bg-green-100 rounded-full">
+                  <TrendingUp size={14} className="text-green-600" />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Scheduled Events</p>
-                <p className="text-2xl font-bold text-gray-900">{scheduledEvents.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <XCircle className="text-red-600" size={24} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Blocked Slots</p>
-                <p className="text-2xl font-bold text-gray-900">{blockedSlots.length}</p>
+              <p className="text-sm font-semibold text-slate-600 mb-1">Event Bookings</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">{eventBookings.length}</p>
+              <div className="mt-3 pt-3 border-t border-green-100">
+                <p className="text-xs text-slate-500">Confirmed events</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="text-purple-600" size={24} />
+          {/* Scheduled Events Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl border border-yellow-100/50 shadow-lg shadow-yellow-500/5 transition-all duration-500 hover:shadow-2xl hover:shadow-yellow-500/10 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg shadow-yellow-500/30 transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                  <Clock className="text-white" size={24} strokeWidth={2.5} />
+                </div>
+                <div className="px-2.5 py-1 bg-yellow-100 rounded-full">
+                  <Calendar size={14} className="text-yellow-600" />
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">₹2.5L</p>
+              <p className="text-sm font-semibold text-slate-600 mb-1">Scheduled Events</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-yellow-800 bg-clip-text text-transparent">{scheduledEvents.length}</p>
+              <div className="mt-3 pt-3 border-t border-yellow-100">
+                <p className="text-xs text-slate-500">Upcoming</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Blocked Slots Card */}
+          <div className="group relative overflow-hidden bg-white rounded-2xl border border-red-100/50 shadow-lg shadow-red-500/5 transition-all duration-500 hover:shadow-2xl hover:shadow-red-500/10 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg shadow-red-500/30 transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                  <XCircle className="text-white" size={24} strokeWidth={2.5} />
+                </div>
+                <div className="px-2.5 py-1 bg-red-100 rounded-full">
+                  <Clock size={14} className="text-red-600" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-slate-600 mb-1">Blocked Slots</p>
+              <p className="text-3xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{blockedSlots.length}</p>
+              <div className="mt-3 pt-3 border-t border-red-100">
+                <p className="text-xs text-slate-500">Maintenance</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Card */}
+          <div className="group relative overflow-hidden bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-700 rounded-2xl shadow-xl shadow-purple-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/40 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                  <TrendingUp className="text-white" size={24} strokeWidth={2.5} />
+                </div>
+                <div className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full">
+                  <BarChart3 size={14} className="text-white" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-purple-100 mb-1">Total Revenue</p>
+              <p className="text-3xl font-bold text-white">₹{((allBookings.reduce((sum, b) => sum + b.total_amount, 0)) / 1000).toFixed(1)}k</p>
+              <div className="mt-3 pt-3 border-t border-white/20">
+                <p className="text-xs text-purple-200">From {allBookings.length} bookings</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main Navigation Tabs */}
-        <div className="flex space-x-4 mb-8">
+        {/* Modern Navigation Tabs with Smooth Animations */}
+        <div className="flex flex-wrap gap-3 mb-8 p-2 bg-white/60 backdrop-blur-xl rounded-2xl border border-orange-100/50 shadow-lg shadow-orange-500/5">
           <button
             onClick={() => setActiveTab("bookings")}
-            className={`px-6 py-3 rounded-md font-medium transition-colors duration-300 ${
-              activeTab === "bookings" ? "bg-[#ff5e14] text-white" : "bg-white text-gray-600 hover:bg-gray-100"
+            className={`group relative overflow-hidden flex items-center px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeTab === "bookings"
+                ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+                : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600 border border-slate-200"
             }`}
           >
-            <Users size={18} className="inline-block mr-2" />
-            View Bookings
+            {activeTab === "bookings" && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+            )}
+            <Users size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+            <span className="relative z-10">View Bookings</span>
           </button>
           <button
             onClick={() => setActiveTab("schedule")}
-            className={`px-6 py-3 rounded-md font-medium transition-colors duration-300 ${
-              activeTab === "schedule" ? "bg-[#ff5e14] text-white" : "bg-white text-gray-600 hover:bg-gray-100"
+            className={`group relative overflow-hidden flex items-center px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeTab === "schedule"
+                ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+                : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600 border border-slate-200"
             }`}
           >
-            <Calendar size={18} className="inline-block mr-2" />
-            Schedule Events & Sports
+            {activeTab === "schedule" && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+            )}
+            <Calendar size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+            <span className="relative z-10">Schedule</span>
           </button>
           <button
             onClick={() => setActiveTab("subscribers")}
-            className={`px-6 py-3 rounded-md font-medium transition-colors duration-300 ${
-              activeTab === "subscribers" ? "bg-[#ff5e14] text-white" : "bg-white text-gray-600 hover:bg-gray-100"
+            className={`group relative overflow-hidden flex items-center px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeTab === "subscribers"
+                ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+                : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600 border border-slate-200"
             }`}
           >
-            <Users size={18} className="inline-block mr-2" />
-            Subscribers
+            {activeTab === "subscribers" && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+            )}
+            <Users size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+            <span className="relative z-10">Subscribers</span>
           </button>
           <button
             onClick={() => setActiveTab("analytics")}
-            className={`px-6 py-3 rounded-md font-medium transition-colors duration-300 ${
-              activeTab === "analytics" ? "bg-[#ff5e14] text-white" : "bg-white text-gray-600 hover:bg-gray-100"
+            className={`group relative overflow-hidden flex items-center px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeTab === "analytics"
+                ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+                : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600 border border-slate-200"
             }`}
           >
-            <BarChart3 size={18} className="inline-block mr-2" />
-            Analytics
+            {activeTab === "analytics" && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+            )}
+            <BarChart3 size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+            <span className="relative z-10">Analytics</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("recent-scheduled")}
+            className={`group relative overflow-hidden flex items-center px-6 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeTab === "recent-scheduled"
+                ? "bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg shadow-orange-500/30 scale-105"
+                : "bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600 border border-slate-200"
+            }`}
+          >
+            {activeTab === "recent-scheduled" && (
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full"></div>
+            )}
+            <Clock size={18} className="mr-2 relative z-10" strokeWidth={2.5} />
+            <span className="relative z-10">Recent & Scheduled</span>
           </button>
         </div>
 
         {/* Content based on active tab */}
         {activeTab === "bookings" && (
           <div>
-            {/* Search Bar and Sub Tabs */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex space-x-4">
+            {/* Premium Search Bar and Sub Tabs */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => setBookingSubTab("today")}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors duration-300 ${
+                  className={`group px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                     bookingSubTab === "today"
-                      ? "bg-yellow-500 text-white"
-                      : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                      ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg shadow-yellow-500/30 scale-105"
+                      : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200"
                   }`}
                 >
-                  Today's Bookings
+                  <span className="relative z-10">Today's Bookings</span>
                 </button>
                 <button
                   onClick={() => setBookingSubTab("sports")}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors duration-300 ${
+                  className={`group px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                     bookingSubTab === "sports"
-                      ? "bg-blue-500 text-white"
-                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                      ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105"
+                      : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
                   }`}
                 >
-                  Sports Bookings
+                  <span className="relative z-10">Sports Bookings</span>
                 </button>
                 <button
                   onClick={() => setBookingSubTab("events")}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors duration-300 ${
+                  className={`group px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                     bookingSubTab === "events"
-                      ? "bg-green-500 text-white"
-                      : "bg-green-100 text-green-800 hover:bg-green-200"
+                      ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30 scale-105"
+                      : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
                   }`}
                 >
-                  Event Bookings
+                  <span className="relative z-10">Event Bookings</span>
                 </button>
               </div>
 
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <input
                   type="text"
                   placeholder="Search bookings..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#ff5e14] focus:border-transparent"
+                  className="w-full sm:w-80 pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all duration-300 font-medium text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search size={20} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" strokeWidth={2.5} />
               </div>
             </div>
 
-            {/* Bookings Tables */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            {/* Premium Tables with Modern Design */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-slate-200/50 shadow-xl shadow-slate-900/5 p-6">
               {bookingSubTab === "today" && (
                 <div className="space-y-8">
                   {/* Today's Sports Bookings */}
@@ -822,8 +913,8 @@ const Admin: React.FC = () => {
                                     {booking.sport}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{booking.time}</td>
-                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.userName}</td>
+                                <td className="px-4 py-3 text-sm text-gray-900">{booking.time_slot}</td>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.name}</td>
                                 <td className="px-4 py-3 text-sm text-gray-900">{booking.location}</td>
                               </tr>
                             ))
@@ -862,12 +953,12 @@ const Admin: React.FC = () => {
                               <tr key={booking.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3">
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    {booking.eventName}
+                                    {booking.sport} - {booking.location}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{booking.time}</td>
-                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.userName}</td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{booking.participants}</td>
+                                <td className="px-4 py-3 text-sm text-gray-900">{booking.time_slot}</td>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.name}</td>
+                                <td className="px-4 py-3 text-sm text-gray-900">{booking.players}</td>
                               </tr>
                             ))
                           ) : (
@@ -910,8 +1001,8 @@ const Admin: React.FC = () => {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900">{booking.date}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{booking.time}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.userName}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{booking.time_slot}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.name}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{booking.location}</td>
                             </tr>
                           ))
@@ -952,13 +1043,13 @@ const Admin: React.FC = () => {
                             <tr key={booking.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3">
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {booking.eventName}
+                                  {booking.sport} - {booking.location}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900">{booking.date}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{booking.time}</td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.userName}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{booking.participants}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{booking.time_slot}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{booking.name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{booking.players}</td>
                             </tr>
                           ))
                         ) : (
@@ -1586,7 +1677,7 @@ const Admin: React.FC = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Active Subscribers</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {subscribers.filter((s) => s.status === "active").length}
+                      {subscribers.length}
                     </p>
                   </div>
                 </div>
@@ -1601,7 +1692,7 @@ const Admin: React.FC = () => {
                     <p className="text-sm font-medium text-gray-600">This Month</p>
                     <p className="text-2xl font-bold text-gray-900">
                       {
-                        subscribers.filter((s) => new Date(s.subscribedDate).getMonth() === new Date().getMonth())
+                        subscribers.filter((s) => new Date(s.created_at).getMonth() === new Date().getMonth())
                           .length
                       }
                     </p>
@@ -1652,7 +1743,7 @@ const Admin: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(subscriber.subscribedDate).toLocaleDateString("en-US", {
+                            {new Date(subscriber.created_at).toLocaleDateString("en-US", {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
@@ -1660,7 +1751,7 @@ const Admin: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              {subscriber.status}
+                              Active
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1716,12 +1807,254 @@ const Admin: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Recent & Scheduled Bookings Tab */}
+        {activeTab === "recent-scheduled" && (
+          <div className="space-y-8">
+            {/* Stats Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Recent Bookings Stats */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 rounded-2xl shadow-xl shadow-orange-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-orange-500/40 hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                <div className="relative p-8">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl shadow-xl transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                      <Clock className="text-white" size={32} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/80 text-sm font-semibold mb-2">Today's Bookings</p>
+                      <p className="text-5xl font-bold text-white">{recentBookings.length}</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/20">
+                    <p className="text-white/90 text-sm">Active bookings for {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scheduled Bookings Stats */}
+              <div className="group relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl shadow-xl shadow-blue-500/30 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/40 hover:-translate-y-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                <div className="relative p-8">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl shadow-xl transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+                      <Calendar className="text-white" size={32} strokeWidth={2.5} />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/80 text-sm font-semibold mb-2">Upcoming Bookings</p>
+                      <p className="text-5xl font-bold text-white">{scheduledBookings.length}</p>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/20">
+                    <p className="text-white/90 text-sm">Scheduled for future dates</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Bookings Section */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-orange-200/50 shadow-xl shadow-orange-900/5 overflow-hidden">
+              <div className="bg-gradient-to-r from-orange-500 to-red-600 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                      <Clock className="text-white" size={20} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Recent Bookings (Today)</h3>
+                      <p className="text-white/80 text-xs">All bookings made for today</p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full">
+                    <span className="text-white font-bold text-sm">{recentBookings.length} Total</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {recentBookings.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-orange-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Sport/Event</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Time Slot</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Customer</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Players</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recentBookings.map((booking) => (
+                          <tr key={booking.id} className="hover:bg-orange-50 transition-colors duration-200">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                booking.booking_type === 'sports' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {booking.booking_type}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="text-sm font-medium text-gray-900">{booking.sport}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 font-medium">{booking.time_slot}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{booking.name}</div>
+                              <div className="text-xs text-gray-500">{booking.email}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{booking.location}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <Users size={14} className="text-gray-400 mr-1" />
+                                <span className="text-sm font-semibold text-gray-900">{booking.players}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-bold text-green-600">₹{booking.total_amount}</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
+                      <Clock className="text-orange-600" size={32} />
+                    </div>
+                    <p className="text-gray-500 font-medium">No bookings for today</p>
+                    <p className="text-gray-400 text-sm mt-1">Recent bookings will appear here</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Scheduled Bookings Section */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-blue-200/50 shadow-xl shadow-blue-900/5 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                      <Calendar className="text-white" size={20} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Scheduled Bookings (Upcoming)</h3>
+                      <p className="text-white/80 text-xs">Future bookings sorted by date</p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full">
+                    <span className="text-white font-bold text-sm">{scheduledBookings.length} Total</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {sortedScheduledBookings.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-blue-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Date</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Sport/Event</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Time Slot</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Customer</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Players</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {sortedScheduledBookings.map((booking) => {
+                          const bookingDate = new Date(booking.date);
+                          const daysUntil = Math.ceil((bookingDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          return (
+                            <tr key={booking.id} className="hover:bg-blue-50 transition-colors duration-200">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-gray-900">
+                                  {bookingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </div>
+                                <div className="text-xs text-blue-600 font-semibold">
+                                  {daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                  booking.booking_type === 'sports' 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {booking.booking_type}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{booking.sport}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 font-medium">{booking.time_slot}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{booking.name}</div>
+                                <div className="text-xs text-gray-500">{booking.email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{booking.location}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <Users size={14} className="text-gray-400 mr-1" />
+                                  <span className="text-sm font-semibold text-gray-900">{booking.players}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-green-600">₹{booking.total_amount}</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                      <Calendar className="text-blue-600" size={32} />
+                    </div>
+                    <p className="text-gray-500 font-medium">No scheduled bookings</p>
+                    <p className="text-gray-400 text-sm mt-1">Future bookings will appear here</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-white py-4 mt-8">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm">© 2025 ArenaHub. All Rights Reserved.</p>
+      {/* Premium Footer */}
+      <footer className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-8 mt-12 border-t border-orange-500/20">
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '20px 20px'
+          }}></div>
+        </div>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-600 via-red-600 to-orange-600"></div>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <Shield className="text-orange-500" size={20} strokeWidth={2.5} />
+            <p className="text-sm font-semibold">© 2025 ArenaHub Admin Portal</p>
+          </div>
+          <p className="text-xs text-slate-400">All Rights Reserved • Secure Dashboard</p>
         </div>
       </footer>
 

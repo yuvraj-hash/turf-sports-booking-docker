@@ -315,6 +315,21 @@ export const insertRegistration = async (registrationData: {
   return data;
 };
 
+// Function to get all bookings
+export const getBookings = async () => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching bookings:', error);
+    throw error;
+  }
+
+  return data;
+};
+
 // Function to get all registrations
 export const getRegistrations = async () => {
   const { data, error } = await supabase
@@ -547,6 +562,36 @@ export const resetPassword = async (token: string, newPassword: string) => {
       updated_at: new Date().toISOString(),
     })
     .eq('reset_token', token);
+
+  return data;
+};
+
+// Function to get all contact messages
+export const getContactMessages = async () => {
+  const { data, error } = await supabase
+    .from('contact_messages')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching contact messages:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to get all newsletter subscribers
+export const getNewsletterSubscribers = async () => {
+  const { data, error } = await supabase
+    .from('newsletter')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching newsletter subscribers:', error);
+    throw error;
+  }
 
   return data;
 };
