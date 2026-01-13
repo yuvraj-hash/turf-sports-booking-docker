@@ -18,6 +18,11 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
@@ -74,4 +79,13 @@
 .focus-visible:focus-visible {
   outline: 2px solid #ff5e14;
   outline-offset: 2px;
+}
+
+/* Admin Modal Custom Utilities */
+.bg-size-200 {
+  background-size: 200% 100%;
+}
+
+.bg-pos-100 {
+  background-position: 100% 0;
 }
